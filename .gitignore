@@ -70,3 +70,6 @@ project/**/metals.sbt
 
 #gradle
 .gradle/
+gradle/
+gradle*
+build.gradle
