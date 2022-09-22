@@ -1,7 +1,5 @@
 package snake.logic
-
 import engine.random.{RandomGenerator, ScalaRandomGen}
-import snake.logic.GameLogic._
 
 import scala.collection.immutable.Queue
 
@@ -19,10 +17,10 @@ class GameLogic(val random: RandomGenerator,
 
   val startingFrame: GameFrame = new GameFrame(
     dimensionsOfGameCanvas = gridDims,
-    snake = Array(
+    snake = Vector(
       new SnakeBodyPart(
         East(),
-        new Point(2, 0)
+        new Point(0, 0)
       ),
       new SnakeBodyPart(
         East(),
@@ -30,9 +28,9 @@ class GameLogic(val random: RandomGenerator,
       ),
       new SnakeBodyPart(
         East(),
-        new Point(0, 0)
+        new Point(2, 0)
       )
-    )
+    )//, apple = new Point(5, 0)
   )
   startingFrame.calculateNewApplePosition(random)
   var gameFrames : SStack[GameFrame] = SStack[GameFrame](startingFrame)
@@ -50,7 +48,7 @@ class GameLogic(val random: RandomGenerator,
 
   // TODO implement me
   def changeDir(d: Direction): Unit = {
-    headDirection = d
+    if(d != headDirection.opposite) headDirection = d
   }
 
   // TODO implement me
@@ -83,55 +81,80 @@ object GameLogic {
 
 case class GameFrame(
                  private val dimensionsOfGameCanvas : Dimensions,
-                 private val snake : Array[SnakeBodyPart],
+                 private val snake : Vector[SnakeBodyPart],
                  private var apple: Point = null,
-                 private var growthQueue : Queue[SnakeBodyPart] = Queue(),
-                 private val grow : Boolean = false
-               ) {
+                 private val growthQueue : Int = 0
+                ) {
   def cellTypeAt(p: Point): CellType =
-    if (isHead(p))        SnakeHead(snake(0).direction)
-    else if (isBody(p))   SnakeBody()
+    if (isHead(p))        SnakeHead(snake.last.direction)
+    else if (isBody(p, snake))   SnakeBody()
     else if (isApple(p))  Apple()
     else Empty()
-  def isHead(p: Point) : Boolean = p == snake(0).position
-  def isBody(p: Point) : Boolean = {
-    for ( aSnakeBodyPart <- snake){
+  def isHead(p: Point) : Boolean = p == snake.last.position
+  def isBody(p: Point, snakeBody: Vector[SnakeBodyPart]) : Boolean = {
+    for ( aSnakeBodyPart <- snakeBody){
       if (aSnakeBodyPart.position == p) return true
     }
     return false
   }
   def isApple(p: Point) : Boolean = apple == p
   def refreshFrame( newDirection: Direction, randomGenerator: RandomGenerator) : GameFrame = {
+    var newGrowthQueue = growthQueue
+    var newSnake = Vector[SnakeBodyPart]()
+    if (growthQueue > 0) {
+      newSnake = generateNewSnakeWithGrowth (newDirection)
+      newGrowthQueue -= 1
+    }
+    else {
+      newSnake = generateNewSnakeWithoutGrowth(newDirection)
+    }
 
-    updateGrowthQueueIfNeeded(randomGenerator)
+    if (newSnake.last.position == apple) {
+      calculateNewApplePosition(randomGenerator, newSnake)
+      newGrowthQueue += 3
+    }
 
     val newGameFrame = GameFrame(
       dimensionsOfGameCanvas,
-      generateNewSnake(newDirection),
+      newSnake,
       apple,
-      growthQueue
-    )
-    return newGameFrame
-  }
-  private def generateNewSnake(newDirection: Direction) : Array[SnakeBodyPart] = {
-    var readyToGrow = !growthQueue.isEmpty && growthQueue.dequeue._1.position == snake.last.position
-    var lengthOfSnake = if (readyToGrow) snake.length + 1 else snake.length
-    val newSnake = new Array[SnakeBodyPart](lengthOfSnake)
-    newSnake(0) = SnakeBodyPart(
-      newDirection,
-      calculateNewBodyPartPosition(snake(0).position, newDirection)
+      newGrowthQueue
     )
 
-    for (i <- 1 until snake.length){
-      newSnake(i) = SnakeBodyPart(
-        snake(i - 1).direction,
-        calculateNewBodyPartPosition(snake(i).position, snake(i - 1).direction)
+    return newGameFrame
+  }
+  private def generateNewSnakeWithGrowth(newDirection: Direction) : Vector[SnakeBodyPart] = {
+    var newSnake = Vector[SnakeBodyPart]()
+    for (i <- 0 until snake.length){
+      newSnake = newSnake :+ SnakeBodyPart(
+        snake(i).direction,
+        snake(i).position
       )
     }
-    if(readyToGrow){
-      newSnake(snake.length) = growthQueue.dequeue._1
-      growthQueue = growthQueue.dequeue._2
+
+    newSnake = newSnake :+ SnakeBodyPart(
+      newDirection,
+      calculateNewBodyPartPosition(snake.last.position, newDirection)
+    )
+    return newSnake
+  }
+
+  private def generateNewSnakeWithoutGrowth(newDirection: Direction) : Vector[SnakeBodyPart] = {
+
+    var newSnake = Vector[SnakeBodyPart]()
+    for (i <- 0 until snake.length - 1) {
+      val aSnakeBodyPart = SnakeBodyPart(
+        snake(i + 1).direction,
+        calculateNewBodyPartPosition(snake(i).position, snake(i + 1).direction)
+      )
+      newSnake = newSnake :+ aSnakeBodyPart
     }
+
+    newSnake = newSnake :+ SnakeBodyPart (
+      newDirection,
+      calculateNewBodyPartPosition(snake.last.position, newDirection)
+    )
+
     return newSnake
   }
   private def calculateNewBodyPartPosition(oldBodyPartPosition : Point, previousDirection : Direction): Point ={
@@ -139,33 +162,24 @@ case class GameFrame(
     val outOfBoundsLocation: Point = dimensionsOfGameCanvas.getLocationIfPointOutOfBounds(newBodyPartLocation)
     if (outOfBoundsLocation == null) newBodyPartLocation else outOfBoundsLocation
   }
-  def calculateNewApplePosition(randomGenerator: RandomGenerator) :Unit = {
-    var freeSpotsIndex : Int = 0
-    var freeSpotsPositions : Array[Point] = new Array[Point](dimensionsOfGameCanvas.height*dimensionsOfGameCanvas.width)
+  def calculateNewApplePosition(randomGenerator: RandomGenerator, snakeBody:Vector[SnakeBodyPart] = snake) :Unit = {
+    /*var freeSpotsIndex : Int = - 1
+    var freeSpotsPositions = Vector[Point]()
     for( aPoint <- dimensionsOfGameCanvas.allPointsInside){
-      if (!isBody(aPoint)){
-        freeSpotsPositions(freeSpotsIndex) = aPoint
+      if (!isBody(aPoint, snakeBody)){
+        freeSpotsPositions :+ Point(aPoint.x, aPoint.y)
         freeSpotsIndex += 1
       }
     }
 
     var randomFreePoint = randomGenerator.randomInt(freeSpotsIndex)
-    apple = freeSpotsPositions(randomFreePoint)
+    apple = freeSpotsPositions(randomFreePoint)*/
+
+    val nrFreeSpots = dimensionsOfGameCanvas.allPointsInside.length - snake.length
+    val appleIndex = randomGenerator.randomInt(nrFreeSpots)
+    apple = dimensionsOfGameCanvas.allPointsInside(appleIndex)
   }
 
-  private def updateGrowthQueueIfNeeded(randomGenerator: RandomGenerator) : Unit ={
-
-    if (snake(0).position != apple) return ()
-    calculateNewApplePosition(randomGenerator)
-    for (i <- 0 until 3) {
-      growthQueue = growthQueue.enqueue(
-        new SnakeBodyPart(
-          snake(0).direction,
-          snake(0).position
-        )
-      )
-    }
-  }
 }
 
 
