@@ -83,7 +83,8 @@ case class GameFrame(
                  private val dimensionsOfGameCanvas : Dimensions,
                  private val snake : Vector[SnakeBodyPart],
                  private val apple: Point,
-                 private val growthQueue : Int = 0
+                 private val growthQueue : Int = 0,
+                 private val isFirstFrame : Boolean = false
                 ) {
   def cellTypeAt(p: Point): CellType =
     if (isHead(p))        SnakeHead(snake.last.direction)
