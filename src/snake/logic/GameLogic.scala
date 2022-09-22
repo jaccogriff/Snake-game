@@ -91,12 +91,6 @@ case class GameFrame(
     else if (isApple(p))  Apple()
     else Empty()
   def isHead(p: Point) : Boolean = p == snake.last.position
-  def isBody(p: Point, snakeBody: Vector[SnakeBodyPart]) : Boolean = {
-    for ( aSnakeBodyPart <- snakeBody){
-      if (aSnakeBodyPart.position == p) return true
-    }
-    return false
-  }
   def isApple(p: Point) : Boolean = apple == p
   def refreshFrame( newDirection: Direction, randomGenerator: RandomGenerator) : GameFrame = {
     val needsToGrow = growthQueue > 0
@@ -163,9 +157,19 @@ case class GameFrame(
 }
 
 object GameFrame {
-  def calculateNewApplePosition(randomGenerator: RandomGenerator, dimensionsOfGameCanvas : Dimensions, snakeBody: Vector[SnakeBodyPart]): Point = {
+  def calculateNewApplePosition(randomGenerator: RandomGenerator, dimensionsOfGameCanvas : Dimensions, gameFrame: GameFrame, snakeBody: Vector[SnakeBodyPart]): Point = {
     val nrFreeSpots = dimensionsOfGameCanvas.allPointsInside.length - snakeBody.length
     val appleIndex = randomGenerator.randomInt(nrFreeSpots)
-    return dimensionsOfGameCanvas.allPointsInside(appleIndex)
+    val freePoint = findClosestFreePoint(dimensionsOfGameCanvas.allPointsInside, appleIndex, gameFrame)
+    return freePoint
   }
+
+  def findClosestFreePoint(gameCells: Seq[Point], randomIndex: Int, gameFrame: GameFrame) : Point = {
+    for (i <- randomIndex until  gameCells.length){
+      val randomPointType = gameFrame.cellTypeAt( gameCells(i) )
+      if( randomPointType == Empty() ) return gameCells(i)
+    }
+    return null
+  }
+
 }
