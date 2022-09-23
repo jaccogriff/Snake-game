@@ -1,6 +1,7 @@
 package snake.logic
 import engine.random.{RandomGenerator, ScalaRandomGen}
 
+import scala.:+
 import scala.collection.immutable.Queue
 
 //import java.util.random.RandomGenerator
@@ -30,7 +31,8 @@ class GameLogic(val random: RandomGenerator,
   )
   val startingFrame: GameFrame = new GameFrame(
     dimensionsOfGameCanvas = gridDims,
-    snake = startingSnake
+    snake = startingSnake,
+    apple = GameFrame.calculateNewApplePosition(gridDims, random, startingSnake)
   )
   var gameFrames : SStack[GameFrame] = SStack[GameFrame](startingFrame)
   var headDirection : Direction = East()
@@ -38,6 +40,8 @@ class GameLogic(val random: RandomGenerator,
 
   // TODO implement me
   def step(): Unit = {
+
+    
 
     gameFrames = gameFrames.push(gameFrames.top.refreshFrame(headDirection, random))
   }
@@ -58,7 +62,7 @@ class GameLogic(val random: RandomGenerator,
 /** GameLogic companion object */
 object GameLogic {
 
-  val FramesPerSecond: Int = 1 // change this to increase/decrease speed of game1
+  val FramesPerSecond: Int = 5 // change this to increase/decrease speed of game1
 
   val DrawSizeFactor = 1.0 // increase this to make the game bigger (for high-res screens)
   // or decrease to make game smaller
@@ -102,7 +106,7 @@ case class GameFrame(
     val needsToGrow = growthQueue > 0
     val newSnake = if (needsToGrow) generateNewSnakeWithGrowth (newDirection) else generateNewSnakeWithoutGrowth(newDirection)
     val appleEaten = newSnake.last.position == apple
-    val newApple = if (appleEaten) calculateNewApplePosition(randomGenerator, dimensionsOfGameCanvas, newSnake) else apple
+    val newApple = if (appleEaten) GameFrame.calculateNewApplePosition(dimensionsOfGameCanvas, randomGenerator, newSnake) else apple
 
     val newGrowthQueue = {
       if (!needsToGrow && appleEaten)       growthQueue + 3
@@ -121,15 +125,7 @@ case class GameFrame(
     return newGameFrame
   }
   private def generateNewSnakeWithGrowth(newDirection: Direction) : Vector[SnakeBodyPart] = {
-    var newSnake = Vector[SnakeBodyPart]()
-    for (i <- 0 until snake.length){
-      newSnake = newSnake :+ SnakeBodyPart(
-        snake(i).direction,
-        snake(i).position
-      )
-    }
-
-    newSnake = newSnake :+ SnakeBodyPart(
+    val newSnake = snake :+ SnakeBodyPart(
       newDirection,
       calculateNewBodyPartPosition(snake.last.position, newDirection)
     )
@@ -160,19 +156,12 @@ case class GameFrame(
     if (outOfBoundsLocation == null) newBodyPartLocation else outOfBoundsLocation
   }
 
-  def calculateNewApplePosition(randomGenerator: RandomGenerator, dimensionsOfGameCanvas: Dimensions, snakeBody: Vector[SnakeBodyPart]): Point = {
-    val nrFreeSpots = dimensionsOfGameCanvas.allPointsInside.length - snakeBody.length
-    val appleIndex = randomGenerator.randomInt(nrFreeSpots)
-    val freePoint = findClosestFreePoint(dimensionsOfGameCanvas.allPointsInside, appleIndex)
-    return freePoint
-  }
+}
 
-  def findClosestFreePoint(gameCells: Seq[Point], randomIndex: Int): Point = {
-    for (i <- randomIndex until gameCells.length) {
-      val randomPointType = cellTypeAt(gameCells(i))
-      if (randomPointType == Empty()) return gameCells(i)
-    }
-    return null
+object GameFrame {
+  def calculateNewApplePosition(dimensionsOfGameCanvas: Dimensions, randomGenerator: RandomGenerator, snakeBody: Vector[SnakeBodyPart]): Point = {
+    val allPoints = dimensionsOfGameCanvas.allPointsInside.diff(SnakeBodyPart.toPoints(snakeBody))
+    val appleIndex = randomGenerator.randomInt(allPoints.size)
+    return allPoints(appleIndex)
   }
-
 }
