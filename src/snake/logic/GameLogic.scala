@@ -6,11 +6,7 @@ import scala.collection.immutable.Queue
 
 //import java.util.random.RandomGenerator
 
-/** To implement Snake, complete the ``TODOs`` below.
- *
- * If you need additional files,
- * please also put them in the ``snake`` package.
- */
+
 
 class GameLogic(val random: RandomGenerator,
                 val gridDims : Dimensions) {
@@ -36,25 +32,23 @@ class GameLogic(val random: RandomGenerator,
   )
   var gameFrames : SStack[GameFrame] = SStack[GameFrame](startingFrame)
   var headDirection : Direction = East()
-  def gameOver: Boolean = false
+  def gameOver: Boolean = {
+    gameFrames.top.isSnakeHeadTouchingBody()
+  }
 
-  // TODO implement me
   def step(): Unit = {
-
-    
-
-    gameFrames = gameFrames.push(gameFrames.top.refreshFrame(headDirection, random))
+    if (!gameOver){
+      gameFrames = gameFrames.push(gameFrames.top.refreshFrame(headDirection, random))
+    }
   }
 
   // TODO implement me
   def setReverse(r: Boolean): Unit = ()
 
-  // TODO implement me
   def changeDir(d: Direction): Unit = {
-    if(d != headDirection.opposite) headDirection = d
+    if(d != gameFrames.top.getSnakeHead().direction.opposite) headDirection = d
   }
 
-  // TODO implement me
   def getCellType(p : Point): CellType = gameFrames.top.cellTypeAt(p)
 
 }
@@ -62,7 +56,7 @@ class GameLogic(val random: RandomGenerator,
 /** GameLogic companion object */
 object GameLogic {
 
-  val FramesPerSecond: Int = 5 // change this to increase/decrease speed of game1
+  val FramesPerSecond: Int = 1 // change this to increase/decrease speed of game1
 
   val DrawSizeFactor = 1.0 // increase this to make the game bigger (for high-res screens)
   // or decrease to make game smaller
@@ -79,7 +73,7 @@ object GameLogic {
   // do NOT use DefaultGridDims.width and DefaultGridDims.height
   val DefaultGridDims
     : Dimensions =
-    Dimensions(width = 25, height = 25)  // you can adjust these values to play on a different sized board
+    Dimensions(width = 6, height = 1)  // you can adjust these values to play on a different sized board
 }
 
 case class GameFrame(
@@ -93,7 +87,6 @@ case class GameFrame(
     else if (isBody(p))   SnakeBody()
     else if (isApple(p))  Apple()
     else Empty()
-
   def isBody(p: Point): Boolean = {
     for (aSnakeBodyPart <- snake) {
       if (aSnakeBodyPart.position == p) return true
@@ -106,7 +99,10 @@ case class GameFrame(
     val needsToGrow = growthQueue > 0
     val newSnake = if (needsToGrow) generateNewSnakeWithGrowth (newDirection) else generateNewSnakeWithoutGrowth(newDirection)
     val appleEaten = newSnake.last.position == apple
-    val newApple = if (appleEaten) GameFrame.calculateNewApplePosition(dimensionsOfGameCanvas, randomGenerator, newSnake) else apple
+
+    val newApple =
+      if (appleEaten) GameFrame.calculateNewApplePosition(dimensionsOfGameCanvas, randomGenerator, newSnake)
+      else apple
 
     val newGrowthQueue = {
       if (!needsToGrow && appleEaten)       growthQueue + 3
@@ -131,7 +127,6 @@ case class GameFrame(
     )
     return newSnake
   }
-
   private def generateNewSnakeWithoutGrowth(newDirection: Direction) : Vector[SnakeBodyPart] = {
 
     var newSnake = Vector[SnakeBodyPart]()
@@ -155,13 +150,27 @@ case class GameFrame(
     val outOfBoundsLocation: Point = dimensionsOfGameCanvas.getLocationIfPointOutOfBounds(newBodyPartLocation)
     if (outOfBoundsLocation == null) newBodyPartLocation else outOfBoundsLocation
   }
+  def isSnakeHeadTouchingBody():Boolean = {
+    val snakeBody = snake.init
+    val snakeHead = snake.last
 
+    for (aSnakePart <- snakeBody){
+      if (snakeHead.position == aSnakePart.position) return true
+    }
+    return false
+  }
+  def getSnakeHead():SnakeBodyPart = return snake.last
 }
 
 object GameFrame {
   def calculateNewApplePosition(dimensionsOfGameCanvas: Dimensions, randomGenerator: RandomGenerator, snakeBody: Vector[SnakeBodyPart]): Point = {
     val allPoints = dimensionsOfGameCanvas.allPointsInside.diff(SnakeBodyPart.toPoints(snakeBody))
-    val appleIndex = randomGenerator.randomInt(allPoints.size)
-    return allPoints(appleIndex)
+
+    if (allPoints.size <= 0) {
+      return  null
+    } else {
+      val appleIndex = randomGenerator.randomInt(allPoints.size)
+      return allPoints(appleIndex)
+    }
   }
 }
